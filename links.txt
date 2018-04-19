@@ -1,0 +1,2 @@
+Radon case study in Python: http://mc-stan.org/users/documentation/case-studies/radon.html
+

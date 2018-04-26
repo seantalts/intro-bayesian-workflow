@@ -1,74 +1,69 @@
 library(rstan)
 library(ggplot2)
+util = new.env()
+source("stan_utility.R", local = util)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
+#############
+## Scope out your problem
+#############
 df = read.csv("data.csv")
 head(df)
 
-## Pooled
-pooled.model = stan_model("pooled.stan")
-pooled.fit = sampling(pooled.model, list(y=df$log.radon,
-                           x = df$floor.measure,
+#############
+## Model!
+#############
+## 1. Create a new Stan file with your proposed model. We'll start with pooled.stan
+
+#############
+## Check the model with fake data! (skip if short on time)
+## 1. Create a new Stan program (or use R, or some other language) and
+##    generate fake data according to the data-generating process described by
+##    your model.
+#############
+
+#############
+## Fit the model
+#############
+model = stan_model("../pooled.stan")
+fit = sampling(model, list(log_radon=df$log_radon,
+                           basement = df$basement,
                            N=nrow(df)))
-print(pooled.fit)
+#############
+## Check diagnostics
+#############
+util$check_all_diagnostics(fit)
 
-pooled.sample = extract(pooled.fit)
-b = mean(pooled.sample$beta[,1])
-m = mean(pooled.sample$beta[,2])
+#############
+## Check & graph fit
+#############
+print(fit)
+sample = extract(fit)
 
-ggplot(df, aes(floor.measure, log.radon)) + geom_count() +
-  geom_abline(intercept = b, slope = m, linetype=2)
-
-
-
-## Unpooled
-unpooled.model = stan_model("unpooled.stan")
-unpooled.fit = sampling(unpooled.model, list(y=df$log.radon,
-                                             x = df$floor.measure,
-                                             county = df$county,
-                                             N=nrow(df)))
-print(unpooled.fit, probs = c(0.025, 0.5, 0.975))
-
-unpooled.samples = extract(unpooled.fit)
-unpooled.estimates = apply(unpooled.samples$a, 2, mean)
-unpooled.se = apply(unpooled.samples$a, 2, sd)
-unpooled.df = data.frame(unpooled.estimates, 1:85, 
-                         unpooled.estimates + unpooled.se,
-                         unpooled.estimates - unpooled.se)
-names(unpooled.df) = c("a", "county", "upper", "lower")
-unpooled.df = unpooled.df[order(unpooled.df$a),]
-ggplot(unpooled.df, aes(x=1:85, y=a)) + geom_pointrange(aes(ymin = lower, ymax = upper))
-
-## Partial pooling for alpha
-partial.model = stan_model("partial.stan")
-partial.fit = sampling(partial.model, list(y=df$log.radon,
-                                           x = df$floor.measure,
-                                           J=length(unique(df$county)),
-                                           county = df$county,
-                                           uranium = df$uranium,
-                                           N=nrow(df)))
-samples = extract(partial.fit)
-ggplot(df, aes(floor.measure, log.radon)) + geom_count() +
-  sapply(1:85, function(i){
-    geom_abline(intercept = mean(samples$a[,i]),
-                slope = mean(samples$beta),
-                alpha=0.3)
+# This line just plots our data by basement indicator
+ggplot(df, aes(basement, log_radon)) + geom_count() +
+  # This next snippet will select every 10th posterior sample and plot the 
+  # fit lines corresponding to that sample. It's a good way to get a sense of
+  # the uncertainty / distribution of the posterior
+  sapply(seq(1, nrow(sample$alpha), 10), function(i) {
+    geom_abline(intercept = sample$alpha[i],
+                slope = sample$basement_effect[i], alpha=0.03)
   })
+#############
+## Check PPCs
+#############
+# Plot a single house's posterior predictive distribution (house 919 here)
+ppcs = as.data.frame(sample$yppc)
+ggplot(ppcs) + geom_density(aes(V919)) + geom_vline(xintercept=df$log_radon[919])
 
-## Partial pooling for alpha and beta
-partial.model = stan_model("partial.stan")
-partial.fit = sampling(partial.model, list(y=df$log.radon,
-                                           x = df$floor.measure,
-                                           J=length(unique(df$county)),
-                                           county = df$county,
-                                           uranium = df$uranium,
-                                           N=nrow(df)))
-samples = extract(partial.fit)
-ggplot(df, aes(floor.measure, log.radon)) + geom_count() +
-  sapply(1:85, function(i){
-    geom_abline(intercept = mean(samples$a[,i]),
-                slope = mean(samples$beta[,i]),
-                alpha=0.3)
-  })
-#launch_shinystan(partial.fit)
+# Plot an entire replication's distribution against the actual data's distribution
+rep = 2000
+ppcs = data.frame(log_radon = df$log_radon,
+                  model = sample$yppc[rep,])
+library(reshape2) # I wish I didn't have this dependency here
+ppcs = reshape2::melt(ppcs)
+ggplot(ppcs, aes(x=value, linetype=variable)) + geom_density(alpha=0.2)
+
+# Shinystan!
+#launch_shinystan(fit)

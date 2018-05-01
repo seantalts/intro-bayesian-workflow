@@ -21,7 +21,15 @@ head(df)
 ## 1. Create a new Stan program (or use R, or some other language) and
 ##    generate fake data according to the data-generating process described by
 ##    your model.
+## 2. Follow the rest of this workflow with your fake data!
 #############
+# To use Stan to generate fake data, we use the `generated quantities` block
+# and the 'Fixed_param' algorithm. The following snippet will generate 
+# 200 fake data points.
+# gen.model = stan_model("gen.stan")
+# gen.data = sampling(data=d, algorithm='Fixed_param', warmup=0, iter=200)
+# gendf = as.data.frame(gen.data)
+# dataset.1 = gendf[1,]
 
 #############
 ## Fit the model
@@ -50,6 +58,23 @@ ggplot(df, aes(basement, log_radon)) + geom_count() +
     geom_abline(intercept = sample$alpha[i],
                 slope = sample$basement_effect[i], alpha=0.03)
   })
+
+## This snippet makes the unpooled and hierarchical fit checking graph
+## This will fail if you try to use it on the pooled model with a single alpha,
+## so I'm starting with it commented out.
+# estimates = apply(sample$a, 2, mean)
+# sd = apply(sample$a, 2, sd)
+# fit.df = data.frame(estimates, 1:85, 
+#                          estimates + 2*sd,
+#                          estimates - 2*sd,
+#                          sd)
+# names(fit.df) = c("a", "county", "upper", "lower", "sd")
+# fit.df = fit.df[order(fit.df$a),]
+# 
+# ggplot(fit.df, aes(x=1:85, y=a)) + geom_pointrange(aes(ymin = lower, ymax = upper)) +
+#   ylim(-1.1, 3.5)
+
+
 #############
 ## Check PPCs
 #############
@@ -61,7 +86,7 @@ ggplot(ppcs) + geom_density(aes(V919)) + geom_vline(xintercept=df$log_radon[919]
 rep = 2000
 ppcs = data.frame(log_radon = df$log_radon,
                   model = sample$yppc[rep,])
-library(reshape2) # I wish I didn't have this dependency here
+library(reshape2)
 ppcs = reshape2::melt(ppcs)
 ggplot(ppcs, aes(x=value, linetype=variable)) + geom_density(alpha=0.2)
 

@@ -79,16 +79,18 @@ ggplot(df, aes(basement, log_radon)) + geom_count() +
 ## Check PPCs
 #############
 # Plot a single house's posterior predictive distribution (house 919 here)
-ppcs = as.data.frame(sample$yppc)
-ggplot(ppcs) + geom_density(aes(V919)) + geom_vline(xintercept=df$log_radon[919])
+## Commented out for now!
 
-# Plot an entire replication's distribution against the actual data's distribution
-rep = 2000
-ppcs = data.frame(log_radon = df$log_radon,
-                  model = sample$yppc[rep,])
-library(reshape2)
-ppcs = reshape2::melt(ppcs)
-ggplot(ppcs, aes(x=value, linetype=variable)) + geom_density(alpha=0.2)
+# ppcs = as.data.frame(sample$yppc)
+# ggplot(ppcs) + geom_density(aes(V919)) + geom_vline(xintercept=df$log_radon[919])
+# 
+# # Plot an entire replication's distribution against the actual data's distribution
+# rep = 2000
+# ppcs = data.frame(log_radon = df$log_radon,
+#                   model = sample$yppc[rep,])
+# library(reshape2)
+# ppcs = reshape2::melt(ppcs)
+# ggplot(ppcs, aes(x=value, linetype=variable)) + geom_density(alpha=0.2)
 
 # Shinystan!
 #launch_shinystan(fit)
